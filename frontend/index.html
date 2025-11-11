@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance App</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; }
+      h1 { margin-bottom: 4px; }
+      h2 { margin-top: 24px; }
+      form, .block { border: 1px solid #ddd; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+      label { display: block; margin: 8px 0 4px; }
+      input, select, button { padding: 8px; }
+      table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      .row > * { flex: 1 1 180px; }
+      .hint { color: #666; font-size: 12px; }
+      .error { color: #b00020; }
+      .success { color: #0a7a0a; }
+    </style>
+  </head>
+  <body>
+    <h1>Attendance App</h1>
+    <div id="msg"></div>
+
+    <h2>Create Attendance</h2>
+    <form id="createForm">
+      <div class="row">
+        <div>
+          <label for="c_rollNo">Roll No</label>
+          <input id="c_rollNo" name="rollNo" required />
+        </div><br><br>
+        <div>
+          <label for="c_name">Name</label>
+          <input id="c_name" name="name" required />
+        </div>
+        <div>
+          <label for="c_date">Date (YYYY-MM-DD)</label>
+          <input id="c_date" name="date" placeholder="2025-11-11" required />
+        </div>
+        <div>
+          <label for="c_status">Status</label>
+          <select id="c_status" name="status" required>
+            <option value="Present">Present</option>
+            <option value="Absent">Absent</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button type="submit">Create</button>
+      </div>
+      
+    </form>
+
+    <h2>List Present Students</h2>
+    <div class="block">
+      <button id="btnPresent">Reload</button>
+      <div id="presentContainer"></div>
+    </div>
+
+    <h2>Attendance By Date</h2>
+    <div class="block">
+      <div class="row">
+        <div>
+          <label for="q_date">Date (YYYY-MM-DD)</label>
+          <input id="q_date" placeholder="2025-11-11" />
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button id="btnByDate">ReLoad</button>
+      </div>
+      <div id="byDateContainer"></div>
+    </div>
+
+    <h2>Update Attendance</h2>
+    <form id="updateForm">
+      <div class="row">
+        <div>
+          <label for="u_id">Record ID</label>
+          <input id="u_id" placeholder="MongoDB _id" required />
+        </div>
+        <div>
+          <label for="u_rollNo">Roll No</label>
+          <input id="u_rollNo" />
+        </div>
+        <div>
+          <label for="u_name">Name</label>
+          <input id="u_name" />
+        </div>
+        <div>
+          <label for="u_date">Date (YYYY-MM-DD)</label>
+          <input id="u_date" />
+        </div>
+        <div>
+          <label for="u_status">Status</label>
+          <select id="u_status">
+            <option value="Present">Present</option>
+            <option value="Absent">Absent</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button type="submit">Update</button>
+      </div>
+    
+    </form>
+
+    <h2>Delete Attendance</h2>
+    <form id="deleteForm">
+      <div class="row">
+        <div>
+          <label for="d_id">Record ID</label>
+          <input id="d_id" placeholder="MongoDB _id" required />
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button type="submit" style="background:#b00020;color:#fff;">Delete</button>
+      </div>
+    </form>
+
+    <h2>All Records</h2>
+    <div class="block">
+      <button id="btnAll">Load All</button>
+      <div id="allContainer"></div>
+    </div>
+
+    <script>
+      const API_BASE = 'http://localhost:5000/api/attendance';
+
+      const msg = (text, cls='') => {
+        const el = document.getElementById('msg');
+        el.className = cls;
+        el.textContent = text;
+        if (text) setTimeout(() => { el.textContent=''; el.className=''; }, 3000);
+      };
+
+      const renderTable = (items) => {
+        if (!items || items.length === 0) return '<div>No records</div>';
+        const rows = items.map(r => `
+          <tr>
+            <td>${r._id}</td>
+            <td>${r.rollNo}</td>
+            <td>${r.name}</td>
+            <td>${r.date}</td>
+            <td>${r.status}</td>
+          </tr>
+        `).join('');
+        return `
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Roll No</th><th>Name</th><th>Date</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+      };
+
+      document.getElementById('createForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const rollNo = document.getElementById('c_rollNo').value.trim();
+        const name = document.getElementById('c_name').value.trim();
+        const date = document.getElementById('c_date').value.trim();
+        const status = document.getElementById('c_status').value;
+        try {
+          const res = await fetch(API_BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rollNo, name, date, status }) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Create failed');
+          msg('Created', 'success');
+        } catch (err) { msg(err.message, 'error'); }
+      });
+
+      document.getElementById('btnPresent').addEventListener('click', async () => {
+        const res = await fetch(`${API_BASE}/present`);
+        const data = await res.json();
+        document.getElementById('presentContainer').innerHTML = renderTable(data);
+      });
+
+      document.getElementById('btnByDate').addEventListener('click', async () => {
+        const date = document.getElementById('q_date').value.trim();
+        if (!date) return msg('Enter a date', 'error');
+        const res = await fetch(`${API_BASE}/by-date?date=${encodeURIComponent(date)}`);
+        const data = await res.json();
+        document.getElementById('byDateContainer').innerHTML = renderTable(data);
+      });
+
+      document.getElementById('updateForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('u_id').value.trim();
+        const body = {
+          rollNo: document.getElementById('u_rollNo').value.trim() || undefined,
+          name: document.getElementById('u_name').value.trim() || undefined,
+          date: document.getElementById('u_date').value.trim() || undefined,
+          status: document.getElementById('u_status').value || undefined,
+        };
+        try {
+          const res = await fetch(`${API_BASE}/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Update failed');
+          msg('Updated', 'success');
+        } catch (err) { msg(err.message, 'error'); }
+      });
+
+      document.getElementById('deleteForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('d_id').value.trim();
+        try {
+          const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Delete failed');
+          msg('Deleted', 'success');
+        } catch (err) { msg(err.message, 'error'); }
+      });
+
+      document.getElementById('btnAll').addEventListener('click', async () => {
+        const res = await fetch(API_BASE);
+        const data = await res.json();
+        document.getElementById('allContainer').innerHTML = renderTable(data);
+      });
+    </script>
+  </body>
+  </html>
